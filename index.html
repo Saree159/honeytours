@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Honey Tours — תכנן את ירח הדבש שלך</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #FFF8EE;
+      color: #1A1A2E;
+      direction: rtl;
+      min-height: 100vh;
+    }
+
+    input[type="text"],
+    input[type="date"] {
+      font-family: inherit;
+      width: 100%;
+      padding: 13px 16px;
+      border: 2px solid #E0D5C5;
+      border-radius: 10px;
+      font-size: 15px;
+      background: white;
+      color: #1A1A2E;
+      direction: rtl;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: #C8973A;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .fade-in {
+      animation: fadeIn 0.35s ease-out;
+    }
+
+    @media (max-width: 580px) {
+
+      .grid-2,
+      .grid-3 {
+        grid-template-columns: 1fr 1fr !important;
+      }
+
+      .grid-3 {
+        grid-template-columns: 1fr !important;
+      }
+
+      .dest-body {
+        grid-template-columns: 1fr !important;
+      }
+
+      .price-boxes {
+        flex-direction: column !important;
+      }
+
+      .meta-row {
+        flex-direction: column !important;
+        gap: 6px !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    // ─── PHONE NUMBER ─────────────────────────────────────────────────────────────
+    const WHATSAPP_NUMBER = "972509138852";
+
+    // ─── GOOGLE SHEETS BACKEND ────────────────────────────────────────────────────
+    // After deploying the Apps Script, paste your Web App URL here:
+    const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzI4eweP__-aw3Z20k7J2lGKLOR0pxtSEgT26lsGbrYXgj4pETDlKyQ6MxlAlQ41m9m4g/exec";
+    function submitToSheet(data) {
+      if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL === "PASTE_YOUR_URL_HERE") return;
+      const params = new URLSearchParams({
+        action:    'submit',
+        name:      data.name      || '',
+        phone:     data.phone     || '',
+        startDate: data.startDate || '',
+        route:     data.route     || '',
+        budget:    data.budget    || '',
+        room:      data.room      || '',
+      });
+      // Image ping: works cross-origin with zero CORS issues
+      const img = new Image();
+      img.src = GOOGLE_SCRIPT_URL + '?' + params.toString();
+    }
+
+    // ─── DATA ─────────────────────────────────────────────────────────────────────
+    const ROUTES = {
+      classic: {
+        name: "קלאסי", emoji: "⭐",
+        desc: "פוקט · קו לנטה · קראבי · קו סמוי · סינגפור",
+        stops: [
+          { id: "phuket", name: "פוקט", emoji: "🌴", nights: 7, beach: "מאי קאו / פאטונג" },
+          { id: "kolanta", name: "קו לנטה", emoji: "🏝️", nights: 2, beach: "לונג ביץ'" },
+          { id: "krabi", name: "קראבי", emoji: "🏔️", nights: 3, beach: "או נאנג / ריילי" },
+          { id: "samui", name: "קו סמוי", emoji: "🌊", nights: 5, beach: "צ'אווונג / למאי" },
+          { id: "singapore", name: "סינגפור", emoji: "✨", nights: 3, beach: "מרינה ביי" },
+        ]
+      },
+      islands: {
+        name: "איים", emoji: "⛵",
+        desc: "פוקט · קו פי פי · קראבי · קו סמוי · סינגפור",
+        stops: [
+          { id: "phuket", name: "פוקט", emoji: "🌴", nights: 7, beach: "מאי קאו / פאטונג" },
+          { id: "phiphi", name: "קו פי פי", emoji: "⛵", nights: 2, beach: "קו פי פי דון" },
+          { id: "krabi", name: "קראבי", emoji: "🏔️", nights: 3, beach: "או נאנג / ריילי" },
+          { id: "samui", name: "קו סמוי", emoji: "🌊", nights: 5, beach: "צ'אווונג / למאי" },
+          { id: "singapore", name: "סינגפור", emoji: "✨", nights: 3, beach: "מרינה ביי" },
+        ]
+      },
+      extended: {
+        name: "מורחב", emoji: "🌏",
+        desc: "פוקט · קו פי פי · קראבי · קו סמוי · בנגקוק",
+        stops: [
+          { id: "phuket", name: "פוקט", emoji: "🌴", nights: 7, beach: "מאי קאו / פאטונג" },
+          { id: "phiphi", name: "קו פי פי", emoji: "⛵", nights: 2, beach: "קו פי פי דון" },
+          { id: "krabi", name: "קראבי", emoji: "🏔️", nights: 3, beach: "או נאנג / ריילי" },
+          { id: "samui", name: "קו סמוי", emoji: "🌊", nights: 5, beach: "צ'אווונג / למאי" },
+          { id: "bangkok", name: "בנגקוק", emoji: "🏙️", nights: 3, beach: "מרכז העיר" },
+        ]
+      },
+      thailand: {
+        name: "תאילנד", emoji: "🐘",
+        desc: "פוקט · קו לנטה · קראבי · קו סמוי",
+        stops: [
+          { id: "phuket", name: "פוקט", emoji: "🌴", nights: 7, beach: "מאי קאו / פאטונג" },
+          { id: "kolanta", name: "קו לנטה", emoji: "🏝️", nights: 2, beach: "לונג ביץ'" },
+          { id: "krabi", name: "קראבי", emoji: "🏔️", nights: 3, beach: "או נאנג / ריילי" },
+          { id: "samui", name: "קו סמוי", emoji: "🌊", nights: 5, beach: "צ'אווונג / למאי" },
+        ]
+      }
+    };
+
+    const HOTELS = {
+      budget: {
+        phuket: ["Four Points by Sheraton Patong", "Palmyra Patong Resort"],
+        kolanta: ["Layana Resort & Spa"],
+        phiphi: ["PP Princess Resort"],
+        krabi: ["Poonsiri Resort Aonang"],
+        samui: ["Banana Fan Sea Resort", "Nora Beach Resort & Spa"],
+        singapore: ["Wyndham Singapore Hotel"],
+        bangkok: ["LiT BANGKOK Hotel"],
+      },
+      mid: {
+        phuket: ["The Kee Resort & Spa", "SALA Phuket Mai Khao Beach"],
+        kolanta: ["Layana Resort & Spa"],
+        phiphi: ["PP Princess Resort"],
+        krabi: ["Hotel Adam Krabi", "Aonang Villa Resort"],
+        samui: ["Amari Koh Samui", "Synergy Samui"],
+        singapore: ["Wyndham Singapore Hotel"],
+        bangkok: ["LiT BANGKOK Hotel"],
+      },
+      luxury: {
+        phuket: ["Anantara Mai Khao Phuket Villas", "The Pavilions Phuket", "The Shore at Katathani"],
+        kolanta: ["Layana Resort & Spa"],
+        phiphi: ["PP Princess Resort"],
+        krabi: ["Railay Bay Resort & Spa", "Hotel Adam Krabi"],
+        samui: ["Silavadee Pool Spa Resort", "Khwan Beach Resort Adults Only"],
+        singapore: ["Wyndham Singapore Hotel"],
+        bangkok: ["LiT BANGKOK Hotel"],
+      }
+    };
+
+    const ACTIVITIES = {
+      phuket: ["חוף מאי קאו – שקט, צלול ורומנטי", "ג'יימס בונד איילנד + קיאקינג בפנג-נגה", "Promthep Cape – שקיעה עוצרת נשימה", "Big Buddha ועיר העתיקה של פוקט"],
+      kolanta: ["חוף לונג ביץ' – שקט ורומנטי", "סנורקלינג ב-Koh Rok ו-Koh Ha", "ספא יוקרתי ב-Layana Resort", "שוק הערב של מולאה ביי"],
+      phiphi: ["מאיה ביי + מערת ויקינג בסירה", "מצוק התצפית – נוף פנורמי על האיים", "צלילה ושנורקלינג עם צבי ים", "חוף Loh Dalum Bay בשקיעה"],
+      krabi: ["טיול 4 האיים בסירת דראגון", "מקדש Tiger Cave – 1,237 מדרגות ונוף", "ריילי ביץ' – נגיש בסירה בלבד", "בריכת האמרלד ויערות גשם"],
+      samui: ["פארק Ang Thong הימי הלאומי", "Big Buddha ו-Fisherman's Village", "יום צלילה ב-Koh Tao הטרופי", "Na Muang Waterfalls – מפלים בג'ונגל"],
+      singapore: ["Gardens by the Bay + Supertrees לילה", "Marina Bay Sands Skypark", "Universal Studios ו-Sentosa Island", "שווקי Hawker Centres – אוכל מקומי"],
+      bangkok: ["Wat Pho + Wat Arun – מקדשים מרהיבים", "שוק Chatuchak – 15,000 דוכנים", "אוכל רחוב בחיי לילה עשירים", "קניות ב-Siam Paragon ו-MBK"],
+    };
+
+    // Estimated nightly rate (₪) per destination per budget tier
+    // Based on real hotel prices from the Honey Tours collection
+    const DEST_RATES = {
+      budget: { phuket: 650, kolanta: 700, phiphi: 550, krabi: 450, samui: 600, singapore: 800, bangkok: 550 },
+      mid: { phuket: 1200, kolanta: 1300, phiphi: 900, krabi: 1000, samui: 1150, singapore: 1200, bangkok: 950 },
+      luxury: { phuket: 2600, kolanta: 2100, phiphi: 1600, krabi: 2300, samui: 2900, singapore: 2000, bangkok: 1700 },
+    };
+
+    const RATE_LABEL = { budget: "חסכוני", mid: "מרוסן", luxury: "יוקרה" };
+    const FLIGHT_COST = 11000;
+
+    const ROOM_LABEL = {
+      villa: "וילה עם בריכה פרטית 🏊",
+      sea: "חדר עם נוף לים 🌊",
+      standard: "חדר קינג סטנדרט 🛏️",
+    };
+
+    // ─── UTILS ────────────────────────────────────────────────────────────────────
+    function parseLocalDate(str) {
+      const [y, m, d] = str.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+
+    function addDaysToDate(date, days) {
+      const d = new Date(date);
+      d.setDate(d.getDate() + days);
+      return d;
+    }
+
+    function fmt(date) {
+      return date.toLocaleDateString('he-IL', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    function fmtShort(date) {
+      return date.toLocaleDateString('he-IL', { day: 'numeric', month: 'short' });
+    }
+
+    function price(n) {
+      return "₪" + Math.round(n).toLocaleString('he-IL');
+    }
+
+    // ─── HEADER ───────────────────────────────────────────────────────────────────
+    function Header() {
+      return (
+        <div style={{ background: '#1A1A2E', padding: '18px 28px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: '#C8973A', letterSpacing: 1 }}>HONEY TOURS</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>מומחי ירח דבש בתאילנד וסינגפור</div>
+          </div>
+          <div style={{ fontSize: 26 }}>🍯</div>
+        </div>
+      );
+    }
+
+    // ─── STEP INDICATOR ───────────────────────────────────────────────────────────
+    function Steps({ step }) {
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
+          {['פרטי הטיול', 'הצעת המסלול'].map((label, i) => (
+            <React.Fragment key={i}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{
+                  width: 30, height: 30, borderRadius: '50%', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13,
+                  background: i + 1 <= step ? (i + 1 < step ? '#1A1A2E' : '#C8973A') : '#E0D5C5',
+                  color: i + 1 <= step ? 'white' : '#aaa',
+                }}>
+                  {i + 1 < step ? '✓' : i + 1}
+                </div>
+                <span style={{ fontSize: 13, fontWeight: i + 1 === step ? 700 : 400, color: i + 1 === step ? '#1A1A2E' : '#aaa' }}>
+                  {label}
+                </span>
+              </div>
+              {i === 0 && <div style={{ flex: 1, height: 2, background: step > 1 ? '#1A1A2E' : '#E0D5C5', borderRadius: 1 }} />}
+            </React.Fragment>
+          ))}
+        </div>
+      );
+    }
+
+    // ─── OPTION CARD ──────────────────────────────────────────────────────────────
+    function Card({ selected, onClick, children, style = {} }) {
+      return (
+        <div
+          onClick={onClick}
+          style={{
+            border: `2px solid ${selected ? '#C8973A' : '#E0D5C5'}`,
+            borderRadius: 12, padding: '14px 16px', cursor: 'pointer',
+            background: selected ? '#FFFBF3' : 'white',
+            transition: 'border-color 0.15s, box-shadow 0.15s',
+            boxShadow: selected ? '0 0 0 3px rgba(200,151,58,0.12)' : 'none',
+            textAlign: 'right', ...style,
+          }}
+        >
+          {children}
+        </div>
+      );
+    }
+
+    // ─── FORM STEP ────────────────────────────────────────────────────────────────
+    function FormStep({ onSubmit }) {
+      const [form, setForm] = useState({ name: '', phone: '', startDate: '', route: 'classic', budget: 'mid', room: 'sea' });
+      const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+      const valid = form.name.trim().length > 0 && form.phone.trim().length > 0 && form.startDate.length > 0;
+
+      return (
+        <div className="fade-in">
+          <div style={{ fontSize: 26, fontWeight: 900, marginBottom: 6 }}>תכנן את ירח הדבש שלך 🍯</div>
+          <div style={{ fontSize: 15, color: '#666', marginBottom: 30 }}>מלא את הפרטים ונבנה לך מסלול מותאם אישית</div>
+
+          {/* Name */}
+          <div style={{ marginBottom: 22 }}>
+            <label style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>שם מלא *</label>
+            <input type="text" placeholder="למשל: דנה ויואב כהן" value={form.name} onChange={e => set('name', e.target.value)} />
+          </div>
+
+          {/* Phone */}
+          <div style={{ marginBottom: 22 }}>
+            <label style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>מספר וואטסאפ * <span style={{ fontWeight: 400, color: '#888' }}>(נשלח אליכם המחיר המדויק)</span></label>
+            <input type="text" placeholder="למשל: 0521234567" value={form.phone} onChange={e => set('phone', e.target.value)} />
+          </div>
+
+          {/* Start date */}
+          <div style={{ marginBottom: 22 }}>
+            <label style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>תאריך יציאה *</label>
+            <input type="date" value={form.startDate} onChange={e => set('startDate', e.target.value)}
+              min={new Date().toISOString().split('T')[0]} />
+          </div>
+
+          {/* Route */}
+          <div style={{ marginBottom: 22 }}>
+            <label style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>בחר מסלול</label>
+            <div className="grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              {Object.entries(ROUTES).map(([key, r]) => (
+                <Card key={key} selected={form.route === key} onClick={() => set('route', key)}>
+                  <div style={{ fontSize: 22, marginBottom: 5 }}>{r.emoji}</div>
+                  <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 3 }}>{r.name}</div>
+                  <div style={{ fontSize: 11, color: '#888', lineHeight: 1.4 }}>{r.desc}</div>
+                  <div style={{ fontSize: 11, color: '#C8973A', fontWeight: 700, marginTop: 5 }}>
+                    {r.stops.reduce((s, d) => s + d.nights, 0)} לילות · {r.stops.length} יעדים
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          {/* Budget */}
+          <div style={{ marginBottom: 22 }}>
+            <label style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>רמת תקציב</label>
+            <div className="grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              {[
+                ['budget', '💰', 'חסכוני', '₪500–800/לילה'],
+                ['mid', '💎', 'מרוסן', '₪900–1,400/לילה'],
+                ['luxury', '👑', 'יוקרה', '₪1,800+/לילה'],
+              ].map(([key, em, name, range]) => (
+                <Card key={key} selected={form.budget === key} onClick={() => set('budget', key)}>
+                  <div style={{ fontSize: 22, marginBottom: 5 }}>{em}</div>
+                  <div style={{ fontWeight: 800, fontSize: 13 }}>{name}</div>
+                  <div style={{ fontSize: 11, color: '#888', marginTop: 3 }}>{range}</div>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          {/* Room preference */}
+          <div style={{ marginBottom: 30 }}>
+            <label style={{ display: 'block', fontWeight: 700, fontSize: 14, marginBottom: 8 }}>העדפת חדר</label>
+            <div className="grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              {[
+                ['villa', '🏊', 'וילה + בריכה', 'בריכה פרטית'],
+                ['sea', '🌊', 'נוף לים', 'Sea View'],
+                ['standard', '🛏️', 'קינג סטנדרט', 'נוחות מלאה'],
+              ].map(([key, em, name, sub]) => (
+                <Card key={key} selected={form.room === key} onClick={() => set('room', key)}>
+                  <div style={{ fontSize: 22, marginBottom: 5 }}>{em}</div>
+                  <div style={{ fontWeight: 800, fontSize: 13 }}>{name}</div>
+                  <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{sub}</div>
+                </Card>
+              ))}
+            </div>
+          </div>
+
+          <button
+            onClick={() => valid && onSubmit(form)}
+            style={{
+              background: valid ? '#C8973A' : '#E0D5C5',
+              color: 'white', border: 'none', padding: '16px', borderRadius: 12,
+              fontSize: 16, fontWeight: 800, cursor: valid ? 'pointer' : 'not-allowed',
+              width: '100%', transition: 'background 0.2s',
+              letterSpacing: 0.3,
+            }}
+          >
+            {valid ? 'צור את המסלול שלי ←' : 'מלא שם ותאריך להמשך'}
+          </button>
+        </div>
+      );
+    }
+
+    // ─── SUMMARY STEP ─────────────────────────────────────────────────────────────
+    function SummaryStep({ form, onBack }) {
+      const route = ROUTES[form.route];
+      const hotels = HOTELS[form.budget];
+      const rates = DEST_RATES[form.budget];
+
+      const stops = useMemo(() => {
+        let cur = parseLocalDate(form.startDate);
+        return route.stops.map(stop => {
+          const checkin = new Date(cur);
+          const checkout = addDaysToDate(cur, stop.nights);
+          cur = new Date(checkout);
+          const nightlyRate = rates[stop.id] || 900;
+          const destCost = stop.nights * nightlyRate;
+          return { ...stop, checkin, checkout, nightlyRate, destCost };
+        });
+      }, [form.startDate, form.route, form.budget]);
+
+      const totalNights = route.stops.reduce((s, d) => s + d.nights, 0);
+      const startDate = parseLocalDate(form.startDate);
+      const endDate = stops[stops.length - 1].checkout;
+
+      const hotelTotal = stops.reduce((s, d) => s + d.destCost, 0);
+      const supplierTotal = hotelTotal + FLIGHT_COST;
+      const bankFee = Math.round(supplierTotal * 0.04);
+      const agencyCost = supplierTotal + bankFee;
+      const agentProfit = Math.round(agencyCost * 0.10);
+      const customerTotal = agencyCost + agentProfit;
+
+      const waMsg = encodeURIComponent(
+        `שלום Honey Tours! 🍯\nאני ${form.name} ומעוניין/ת בהצעת מחיר לירח דבש בתאילנד.\n\n` +
+        `📋 פרטי הבקשה:\n` +
+        `• מסלול: ${route.name} (${totalNights} לילות)\n` +
+        `• תאריך יציאה: ${fmt(startDate)}\n` +
+        `• תקציב: ${RATE_LABEL[form.budget]}\n` +
+        `• העדפת חדר: ${ROOM_LABEL[form.room]}\n\n` +
+        `אשמח לקבל הצעת מחיר מדויקת עם מחירים חיים 🙏`
+      );
+
+      const G = '#C8973A', N = '#1A1A2E', GR = '#666';
+
+      return (
+        <div className="fade-in">
+
+          {/* Trip header card */}
+          <div style={{ background: 'linear-gradient(135deg, #1A1A2E 0%, #252545 100%)', borderRadius: 16, padding: 26, color: 'white', marginBottom: 24 }}>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', letterSpacing: 1, marginBottom: 4 }}>הצעת מסלול עבור</div>
+            <div style={{ fontSize: 24, fontWeight: 900, marginBottom: 14 }}>{form.name} 🍯</div>
+            <div className="meta-row" style={{ display: 'flex', gap: 18, flexWrap: 'wrap', fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>
+              <span>📅 {fmt(startDate)} – {fmt(endDate)}</span>
+              <span>🌙 {totalNights} לילות</span>
+              <span>🗺️ מסלול {route.name}</span>
+              <span>✈️ כולל טיסות</span>
+            </div>
+            <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ background: G, color: 'white', padding: '4px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700 }}>
+                {RATE_LABEL[form.budget]}
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.12)', color: 'white', padding: '4px 14px', borderRadius: 20, fontSize: 12 }}>
+                {ROOM_LABEL[form.room]}
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.12)', color: 'white', padding: '4px 14px', borderRadius: 20, fontSize: 12 }}>
+                {route.stops.length} יעדים
+              </div>
+            </div>
+          </div>
+
+          {/* Route timeline */}
+          <div style={{ fontSize: 17, fontWeight: 800, marginBottom: 4, color: N }}>המסלול שלך</div>
+          <div style={{ fontSize: 13, color: GR, marginBottom: 18 }}>לחץ על כל יעד לפרטים</div>
+
+          {stops.map((stop, i) => (
+            <div key={i} style={{
+              background: 'white', borderRadius: 16, padding: '18px 20px',
+              marginBottom: 14, boxShadow: '0 2px 14px rgba(0,0,0,0.06)',
+              borderRight: `4px solid ${G}`,
+            }}>
+              {/* Destination header */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 14 }}>
+                <div style={{ fontSize: 30, lineHeight: 1 }}>{stop.emoji}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 800, fontSize: 18, color: N }}>{stop.name}</div>
+                  <div style={{ fontSize: 12, color: GR, marginTop: 2 }}>
+                    {fmtShort(stop.checkin)} → {fmtShort(stop.checkout)} · חוף {stop.beach}
+                  </div>
+                </div>
+                <div style={{
+                  background: '#F5E6CC', color: N, padding: '5px 12px',
+                  borderRadius: 20, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap',
+                }}>
+                  {stop.nights} לילות
+                </div>
+              </div>
+
+              {/* Hotels + Activities */}
+              <div className="dest-body" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: G, letterSpacing: 0.5, marginBottom: 8, textTransform: 'uppercase' }}>
+                    מלונות מומלצים
+                  </div>
+                  {(hotels[stop.id] || []).map((h, j) => (
+                    <div key={j} style={{ fontSize: 13, padding: '4px 0', display: 'flex', alignItems: 'center', gap: 6, color: N }}>
+                      <span style={{ fontSize: 11 }}>🏨</span> {h}
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: G, letterSpacing: 0.5, marginBottom: 8, textTransform: 'uppercase' }}>
+                    חוויות בולטות
+                  </div>
+                  {(ACTIVITIES[stop.id] || []).slice(0, 3).map((a, j) => (
+                    <div key={j} style={{ fontSize: 12, padding: '4px 0', display: 'flex', alignItems: 'flex-start', gap: 6, color: '#444', lineHeight: 1.4 }}>
+                      <span style={{ color: G, fontSize: 10, paddingTop: 3, flexShrink: 0 }}>✦</span>
+                      {a}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Day count badge */}
+              {i < stops.length - 1 && (
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #F0E8DC', display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#aaa' }}>
+                  <span>✈️</span>
+                  <span>טיסה פנים ל{stops[i + 1].name}</span>
+                </div>
+              )}
+            </div>
+          ))}
+
+          {/* Estimate banner */}
+          <div style={{ background: '#FFF3CD', border: '1px solid #F0C040', borderRadius: 14, padding: '16px 20px', marginTop: 8, marginBottom: 20, display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+            <div style={{ fontSize: 24, flexShrink: 0 }}>⚠️</div>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 14, color: '#7D4E00', marginBottom: 4 }}>הערכת מחיר בלבד — לא מחיר סופי</div>
+              <div style={{ fontSize: 13, color: '#7D4E00', lineHeight: 1.6 }}>
+                הטווח למטה מבוסס על ממוצעי עונה — <strong>המחיר האמיתי נקבע רק לאחר בדיקת מחירים חיים ב-Booking.com.</strong><br />
+                שלחו לנו את הפרטים בוואטסאפ ותקבלו הצעת מחיר מדויקת תוך שעות ספורות.
+              </div>
+            </div>
+          </div>
+
+          {/* Rough estimate range card */}
+          <div style={{ background: N, borderRadius: 16, padding: 24, color: 'white', marginBottom: 24 }}>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', letterSpacing: 1, marginBottom: 4 }}>טווח הערכה</div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginBottom: 20 }}>
+              תקציב {RATE_LABEL[form.budget]} · {totalNights} לילות · 2 נוסעים · כולל טיסות
+            </div>
+
+            {/* Simple destination rows — nights only, no fake prices */}
+            <div style={{ marginBottom: 20 }}>
+              {stops.map((stop, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                  <span>{stop.emoji} {stop.name}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12 }}>{stop.nights} לילות</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Estimate range — low and high */}
+            <div style={{ background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: '16px 18px' }}>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginBottom: 10 }}>טווח משוער כולל הכל (מלונות + טיסות + עמלות)</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>מינימום</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>{price(customerTotal * 0.85)}</div>
+                </div>
+                <div style={{ fontSize: 22, color: 'rgba(255,255,255,0.2)' }}>—</div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>מקסימום</div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: 'rgba(255,255,255,0.75)' }}>{price(customerTotal * 1.15)}</div>
+                </div>
+              </div>
+              <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed rgba(200,151,58,0.4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.6)' }}>המחיר המדויק — לאחר הצעה</span>
+                <span style={{ fontSize: 18, fontWeight: 900, color: G, letterSpacing: 1 }}>? ₪</span>
+              </div>
+            </div>
+
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 12, lineHeight: 1.6 }}>
+              * טווח בלבד. מחיר מדויק נשלח לאחר בדיקת מחירים חיים ב-Booking.com עם פילטר ביטול חינם.
+            </div>
+          </div>
+
+          {/* CTA — main action */}
+          <div style={{ background: 'white', borderRadius: 16, padding: 28, textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.10)', marginBottom: 16, border: '2px solid #25D366' }}>
+            <div style={{ fontSize: 22, fontWeight: 900, marginBottom: 8 }}>קבלו הצעת מחיר אמיתית 🎯</div>
+            <div style={{ fontSize: 14, color: GR, marginBottom: 8, lineHeight: 1.7 }}>
+              שלחו לנו את הפרטים — נבדוק מחירים חיים ב-Booking.com
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 22, flexWrap: 'wrap' }}>
+              {['מחירים חיים מ-Booking.com ✅', 'ביטול חינם ✅', 'ללא התחייבות ✅'].map(t => (
+                <span key={t} style={{ fontSize: 12, color: '#1A1A2E', fontWeight: 600 }}>{t}</span>
+              ))}
+            </div>
+            <a
+              href={`https://wa.me/${WHATSAPP_NUMBER}?text=${waMsg}`}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => submitToSheet({ name: form.name, phone: form.phone, startDate: form.startDate, route: form.route, budget: form.budget, room: form.room })}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 10,
+                background: '#25D366', color: 'white', padding: '16px 36px',
+                borderRadius: 12, fontSize: 17, fontWeight: 900,
+                textDecoration: 'none',
+              }}
+            >
+              💬 שלח לקבלת מחיר מדויק
+            </a>
+            <div style={{ marginTop: 16, fontSize: 13, color: '#888', fontWeight: 600 }}>
+              נחזור אליכם עם מחיר סופי תוך שעות ספורות 🍯
+            </div>
+          </div>
+
+          {/* Back button */}
+          <button
+            onClick={onBack}
+            style={{
+              background: 'transparent', color: N, border: `2px solid ${N}`,
+              padding: '13px', borderRadius: 12, fontSize: 14, fontWeight: 700,
+              cursor: 'pointer', width: '100%', marginBottom: 40,
+            }}
+          >
+            ← חזור ושנה פרטים
+          </button>
+        </div>
+      );
+    }
+
+    // ─── APP ──────────────────────────────────────────────────────────────────────
+    function App() {
+      const [step, setStep] = useState(1);
+      const [formData, setFormData] = useState(null);
+
+      return (
+        <div>
+          <Header />
+          <div style={{ maxWidth: 760, margin: '0 auto', padding: '30px 20px' }}>
+            <Steps step={step} />
+            {step === 1 && (
+              <FormStep onSubmit={data => { setFormData(data); setStep(2); window.scrollTo(0, 0); }} />
+            )}
+            {step === 2 && formData && (
+              <SummaryStep form={formData} onBack={() => setStep(1)} />
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+
+</html>
